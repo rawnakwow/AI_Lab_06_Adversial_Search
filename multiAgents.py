@@ -11,12 +11,15 @@
 # Student side autograding was added by Brad Miller, Nick Hay, and
 # Pieter Abbeel (pabbeel@cs.berkeley.edu).
 
+
+
+
 from util import manhattanDistance
 from game import Directions
 import random, util
 
 from game import Agent
-
+from pacman import readCommand, runGames  # Import the game engine and CLI handler
 class ReflexAgent(Agent):
     """
       A reflex agent chooses an action at each choice point by examining
@@ -200,82 +203,81 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
     def getAction(self, gameState):
         """
           Returns the minimax action using self.depth and self.evaluationFunction
-          
-          Alpha-Beta pruning is applied to improve efficiency by ignoring branches 
-          that cannot influence the final decision.
+          with alpha-beta pruning.
         """
-        # Call alphaBeta with initial values:
-        # - Depth starts at 0
-        # - Agent index starts at 0 (Pacman's turn)
-        # - Alpha = -infinity (worst-case for maximizer)
-        # - Beta = +infinity (worst-case for minimizer)
         action, _ = self.alphaBeta(0, 0, gameState, float("-inf"), float("inf"))
         return action
 
     def alphaBeta(self, curr_depth, agent_index, gameState, alpha, beta):
         """
-        Implements the Alpha-Beta Pruning algorithm.
-        :param curr_depth: Current depth of the search tree.
-        :param agent_index: Index of the current agent (0 = Pacman, >=1 = Ghosts).
-        :param gameState: The current state of the game.
-        :param alpha: The best value that the maximizer (Pacman) can guarantee.
-        :param beta: The best value that the minimizer (Ghosts) can guarantee.
-        :return: A tuple (best_action, best_score).
+        Alpha-beta pruning implementation.
+        :param curr_depth: current depth in the search tree
+        :param agent_index: current agent (0 for Pacman, >=1 for ghosts)
+        :param gameState: current game state
+        :param alpha: best score that the maximizer can guarantee
+        :param beta: best score that the minimizer can guarantee
+        :return: action, score
         """
-
-        # Roll over agent index and increase depth when all agents have played
-        # Pacman is agent 0; all other agents (>=1) are Ghosts
+        # Roll over to the next depth level if all agents have taken their turn
         if agent_index >= gameState.getNumAgents():
-            agent_index = 0  # Reset to Pacman
-            curr_depth += 1  # Increment depth for the next round of moves
+            agent_index = 0
+            curr_depth += 1
 
-        # TERMINATION CONDITIONS:
-        # If we reach the maximum depth or the game is over (win or lose), evaluate the state
+        # Terminal state or depth limit reached
         if curr_depth == self.depth or gameState.isWin() or gameState.isLose():
             return None, self.evaluationFunction(gameState)
 
-        # Initialization of variables
-        best_action = None  # This will store the best action for the current agent
+        # Initialize variables
+        best_action = None
 
-        if agent_index == 0:  # Pacman's Turn (Maximizing player)
-            best_score = float("-inf")  # Pacman wants the highest possible score
-            for action in gameState.getLegalActions(agent_index):  # Loop through all possible moves for Pacman
-                next_state = gameState.generateSuccessor(agent_index, action)  # Simulate the game state after taking the action
-                _, score = self.alphaBeta(curr_depth, agent_index + 1, next_state, alpha, beta)  # Recursive call for the next agent
-
-                # Update the best score and action if the current score is better
+        if agent_index == 0:  # Maximizing player (Pacman)
+            best_score = float("-inf")
+            for action in gameState.getLegalActions(agent_index):
+                next_game_state = gameState.generateSuccessor(agent_index, action)
+                _, score = self.alphaBeta(curr_depth, agent_index + 1, next_game_state, alpha, beta)
                 if score > best_score:
                     best_score = score
                     best_action = action
-
-                # Update alpha (the best score Pacman can guarantee)
-                alpha = max(alpha, best_score)
-
-                # PRUNING: Stop exploring further if beta ≤ alpha
-                # This means that the minimizing agent (Ghosts) would never let Pacman reach this state
-                if beta <= alpha:
+                alpha = max(alpha, best_score)  # Update alpha
+                if beta <= alpha:  # Prune remaining branches
                     break
+            return best_action, best_score
 
-        else:  # Ghosts' Turn (Minimizing player)
-            best_score = float("inf")  # Ghosts want the lowest possible score for Pacman
-            for action in gameState.getLegalActions(agent_index):  # Loop through all possible moves for the Ghost
-                next_state = gameState.generateSuccessor(agent_index, action)  # Simulate the game state after taking the action
-                _, score = self.alphaBeta(curr_depth, agent_index + 1, next_state, alpha, beta)  # Recursive call for the next agent
-
-                # Update the best score and action if the current score is worse
+        else:  # Minimizing player (Ghosts)
+            best_score = float("inf")
+            for action in gameState.getLegalActions(agent_index):
+                next_game_state = gameState.generateSuccessor(agent_index, action)
+                _, score = self.alphaBeta(curr_depth, agent_index + 1, next_game_state, alpha, beta)
                 if score < best_score:
                     best_score = score
                     best_action = action
-
-                # Update beta (the best score the Ghosts can guarantee)
-                beta = min(beta, best_score)
-
-                # PRUNING: Stop exploring further if beta ≤ alpha
-                # This means that Pacman would never let the Ghosts reach this state
-                if beta <= alpha:
+                beta = min(beta, best_score)  # Update beta
+                if beta <= alpha:  # Prune remaining branches
                     break
+            return best_action, best_score
 
-        # Return the best action and its score for the current agent
+
+    def minValue(self, curr_depth, agent_index, gameState, alpha, beta):
+        """
+        Handles the minimizing agents' (Ghosts') logic.
+        """
+        best_score = float("inf")
+        best_action = None
+
+        for action in gameState.getLegalActions(agent_index):
+            next_state = gameState.generateSuccessor(agent_index, action)
+            _, score = self.alphaBeta(curr_depth, agent_index + 1, next_state, alpha, beta)
+
+            if score < best_score:
+                best_score = score
+                best_action = action
+
+            beta = min(beta, best_score)
+
+            # Pruning condition
+            if beta <= alpha:
+                break
+
         return best_action, best_score
 
 class ExpectimaxAgent(MultiAgentSearchAgent):
